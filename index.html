@@ -1,6 +1,332 @@
-Denver Office Router
-Enter a candidate's zip code to see which of our four offices is closest by drive time.
-CANDIDATE ZIP CODE
-Find nearest office
-
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Denver Office Router</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #1a1d21;
+    --muted: #60666d;
+    --border: #e3e6ea;
+    --accent: #2b6cb0;
+    --accent-dark: #1f4d80;
+    --success-bg: #e6f4ea;
+    --success-border: #34a853;
+    --success-text: #1e6b34;
+    --error: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 26px;
+    margin: 0 0 6px 0;
+  }
+  .subtitle {
+    color: var(--muted);
+    margin: 0 0 28px 0;
+    font-size: 15px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 18px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 11px 14px;
+    font-size: 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type="text"]:focus, input[type="password"]:focus {
+    border-color: var(--accent);
+  }
+  .row { margin-bottom: 14px; }
+  .row:last-child { margin-bottom: 0; }
+  button {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 16px;
+    font-weight: 600;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover:not(:disabled) { background: var(--accent-dark); }
+  button:disabled {
+    background: #a0a8b0;
+    cursor: not-allowed;
+  }
+  .help {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .help a { color: var(--accent); }
+  #status {
+    margin: 14px 0 0 0;
+    font-size: 14px;
+    color: var(--muted);
+    min-height: 20px;
+  }
+  #status.error { color: var(--error); }
+  .results { margin-top: 18px; }
+  .result-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: #fff;
+  }
+  .result-item.best {
+    background: var(--success-bg);
+    border-color: var(--success-border);
+    border-width: 2px;
+  }
+  .result-name {
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .result-addr {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .result-time {
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    margin-left: 16px;
+  }
+  .best-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--success-border);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+    letter-spacing: 0.4px;
+  }
+  .recommendation {
+    font-size: 17px;
+    font-weight: 600;
+    text-align: center;
+    padding: 14px;
+    background: var(--success-bg);
+    border: 2px solid var(--success-border);
+    color: var(--success-text);
+    border-radius: 8px;
+    margin-bottom: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Denver Office Router</h1>
+  <p class="subtitle">Enter a candidate's zip code to see which of our four offices is closest by drive time.</p>
+ 
+  <div class="card">
+    <div class="row">
+      <label for="zip">Candidate Zip Code</label>
+      <input type="text" id="zip" placeholder="e.g., 80202" inputmode="numeric" maxlength="5">
+    </div>
+    <div class="row">
+      <button id="goBtn">Find nearest office</button>
+    </div>
+    <div id="status"></div>
+  </div>
+ 
+  <div id="results" class="results"></div>
+</div>
+ 
+<script>
+  // OpenRouteService API key (free tier, 2,000 lookups/day)
+  const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImM4MzM0YzhhNmI4MzQxNjk4ODJmYjQxNTlhMmE2ZjczIiwiaCI6Im11cm11cjY0In0=";
+ 
+  // The four offices
+  const OFFICES = [
+    { name: "Bellaire Office",       address: "1873 S. Bellaire St., Denver, CO" },
+    { name: "Golden Office",         address: "825 Simms St, Golden, CO 80401" },
+    { name: "Steele Office",         address: "3875 Steele St, Unit 1244, Denver, CO" },
+    { name: "Greenwood Village Office", address: "7800 E Orchard Rd Ste 200, Greenwood Village, CO 80111" },
+  ];
+ 
+  // Cached coordinates (geocoded once on first run)
+  let officeCoords = null;
+ 
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $("status");
+  const resultsEl = $("results");
+  const goBtn = $("goBtn");
+ 
+  function setStatus(msg, isError) {
+    statusEl.textContent = msg || "";
+    statusEl.className = isError ? "error" : "";
+  }
+ 
+  function formatDuration(seconds) {
+    if (seconds == null || isNaN(seconds)) return "—";
+    const mins = Math.round(seconds / 60);
+    if (mins < 60) return mins + " min";
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h + "h " + (m < 10 ? "0" + m : m) + "m";
+  }
+ 
+  async function geocode(apiKey, text) {
+    const url = "https://api.openrouteservice.org/geocode/search?api_key=" +
+      encodeURIComponent(apiKey) +
+      "&text=" + encodeURIComponent(text) +
+      "&boundary.country=US&size=1";
+    const res = await fetch(url);
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error("Geocoding failed (" + res.status + "): " + body.slice(0, 140));
+    }
+    const data = await res.json();
+    if (!data.features || data.features.length === 0) {
+      throw new Error("Could not find a location for: " + text);
+    }
+    const [lon, lat] = data.features[0].geometry.coordinates;
+    return [lon, lat];
+  }
+ 
+  async function ensureOfficeCoords(apiKey) {
+    if (officeCoords) return officeCoords;
+    setStatus("Locating offices (one-time setup)…");
+    const coords = [];
+    for (const o of OFFICES) {
+      coords.push(await geocode(apiKey, o.address));
+    }
+    officeCoords = coords;
+    return coords;
+  }
+ 
+  async function getDriveTimes(apiKey, sourceCoord, destCoords) {
+    const locations = [sourceCoord, ...destCoords];
+    const body = {
+      locations: locations,
+      sources: [0],
+      destinations: destCoords.map((_, i) => i + 1),
+      metrics: ["duration"],
+      units: "mi",
+    };
+    const res = await fetch("https://api.openrouteservice.org/v2/matrix/driving-car", {
+      method: "POST",
+      headers: {
+        "Authorization": apiKey,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error("Routing failed (" + res.status + "): " + txt.slice(0, 140));
+    }
+    const data = await res.json();
+    // durations[0] is the row for our single source, indexed by destination
+    return data.durations[0];
+  }
+ 
+  function renderResults(ranked) {
+    const best = ranked[0];
+    let html = "";
+    html += '<div class="recommendation">Recommended office: ' + escapeHtml(best.name) + '</div>';
+    ranked.forEach((item, idx) => {
+      html += '<div class="result-item' + (idx === 0 ? " best" : "") + '">';
+      html += '<div>';
+      html += '<div class="result-name">' + escapeHtml(item.name);
+      if (idx === 0) html += '<span class="best-badge">CLOSEST</span>';
+      html += '</div>';
+      html += '<div class="result-addr">' + escapeHtml(item.address) + '</div>';
+      html += '</div>';
+      html += '<div class="result-time">' + formatDuration(item.duration) + '</div>';
+      html += '</div>';
+    });
+    resultsEl.innerHTML = html;
+  }
+ 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+ 
+  async function run() {
+    const zip = $("zip").value.trim();
+    resultsEl.innerHTML = "";
+ 
+    if (!/^\d{5}$/.test(zip)) { setStatus("Please enter a valid 5-digit zip code.", true); return; }
+ 
+    goBtn.disabled = true;
+    try {
+      const destCoords = await ensureOfficeCoords(ORS_API_KEY);
+      setStatus("Looking up zip " + zip + "…");
+      const sourceCoord = await geocode(ORS_API_KEY, zip);
+      setStatus("Calculating drive times…");
+      const durations = await getDriveTimes(ORS_API_KEY, sourceCoord, destCoords);
+ 
+      const ranked = OFFICES.map((o, i) => ({
+        name: o.name,
+        address: o.address,
+        duration: durations[i],
+      })).sort((a, b) => {
+        if (a.duration == null) return 1;
+        if (b.duration == null) return -1;
+        return a.duration - b.duration;
+      });
+ 
+      renderResults(ranked);
+      setStatus("");
+    } catch (err) {
+      setStatus(err.message || String(err), true);
+    } finally {
+      goBtn.disabled = false;
+    }
+  }
+ 
+  goBtn.addEventListener("click", run);
+  $("zip").addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
+</script>
+</body>
+</html>
+ 
